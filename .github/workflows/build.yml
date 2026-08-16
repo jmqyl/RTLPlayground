@@ -3,6 +3,7 @@ name: Build firmware
 on:
   push:
     branches: ['**']
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,7 +18,15 @@ jobs:
         run: |
           apt update
           apt install make gcc sdcc xxd python-is-python3 libjson-c-dev -y
+
       - name: Check if machine.c can be compiled for all machines
         run: make machine_check
+
       - name: Make project
         run: make MACHINE="KP_9000_6XHML_X2"
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-KP9000
+          path: build/   # 请按实际输出路径修改
