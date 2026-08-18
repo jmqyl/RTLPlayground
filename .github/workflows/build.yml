@@ -1,56 +1,23 @@
-name: Build RTLPlayground FG-4GT-2SX_V2.0
+name: Build firmware
 
 on:
-  workflow_dispatch:
-
   push:
-    branches:
-      - main
+    branches: ['**']
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     container:
       image: debian:trixie
 
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
           apt update
-          apt install -y \
-            make \
-            gcc \
-            sdcc \
-            xxd \
-            python-is-python3 \
-            libjson-c-dev
-
-      - name: Show SDCC version
-        run: |
-          sdcc --version
-
-      - name: Clean
-        run: |
-          make clean || true
-          rm -rf output
-
-      - name: Build FG-4GT-2SX_V2.0
-        run: |
-          make MACHINE=FG_4GT_2SX_V2_0
-
-      - name: Show generated firmware
-        run: |
-          echo "===== OUTPUT FILES ====="
-          find output -type f -print
-
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: RTLPlayground-FG-4GT-2SX_V2.0
-          path: output/*.bin
-          if-no-files-found: error
-          retention-days: 30
+          apt install make gcc sdcc xxd python-is-python3 libjson-c-dev -y
+      - name: Check if machine.c can be compiled for all machines
+        run: make machine_check
+      - name: Make project
+        run: make MACHINE="KP_9000_6XHML_X2"
