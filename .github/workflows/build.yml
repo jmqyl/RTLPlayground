@@ -42,14 +42,15 @@ jobs:
         run: |
           make MACHINE=FG_4GT_2SX_V2_0
 
-      - name: Show firmware
+      - name: Show generated firmware
         run: |
-          ls -lh output/
+          echo "===== OUTPUT FILES ====="
+          find output -type f -print
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: RTLPlayground-FG-4GT-2SX_V2.0
-          path: output/*FG_4GT_2SX_V2_0.bin
+          path: output/*.bin
           if-no-files-found: error
           retention-days: 30
