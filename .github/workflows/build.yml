@@ -1,25 +1,48 @@
-- name: Install dependencies
-  run: |
-    apt update
-    apt install -y make gcc sdcc xxd python-is-python3 libjson-c-dev
-    # 若 tools 需要额外库，可在此添加，例如 flex, bison, libssl-dev 等
+name: Build firmware
 
-- name: Build tools
-  run: make tools
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
 
-- name: Check environment
-  run: |
-    echo "MACHINE = FG_4GT_2SX_V2_0"
-    ls -la html/ config.txt || true
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-- name: Build firmware
-  run: make all MACHINE="FG_4GT_2SX_V2_0"
+    container:
+      image: debian:trixie
 
-- name: List generated files
-  run: find output -type f -name "*.bin" -ls
+    steps:
+      - uses: actions/checkout@v6
 
-- name: Upload firmware
-  uses: actions/upload-artifact@v4
-  with:
-    name: firmware
-    path: output/FG_4GT_2SX_V2_0/*.bin
+      - name: Install dependencies
+        run: |
+          apt update
+          apt install -y \
+            make \
+            gcc \
+            sdcc \
+            xxd \
+            python-is-python3 \
+            libjson-c-dev
+
+      - name: Check if machine.c can be compiled for all machines
+        run: |
+          make machine_check
+
+      - name: Make project
+        run: |
+          make MACHINE="FG_4GT_2SX_V2_0"
+
+      - name: Show BIN file
+        run: |
+          echo "===== Generated BIN ====="
+          find output -type f -name "*.bin" -exec ls -lh {} \;
+
+      - name: Upload BIN firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtlplayground-FG_4GT_2SX_V2_0
+          path: output/*.bin
+          if-no-files-found: error
+          retention-days: 30
