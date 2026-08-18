@@ -1,23 +1,25 @@
-name: Build firmware
+- name: Install dependencies
+  run: |
+    apt update
+    apt install -y make gcc sdcc xxd python-is-python3 libjson-c-dev
+    # 若 tools 需要额外库，可在此添加，例如 flex, bison, libssl-dev 等
 
-on:
-  push:
-    branches: ['**']
+- name: Build tools
+  run: make tools
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: debian:trixie
+- name: Check environment
+  run: |
+    echo "MACHINE = FG_4GT_2SX_V2_0"
+    ls -la html/ config.txt || true
 
-    steps:
-      - uses: actions/checkout@v6
+- name: Build firmware
+  run: make all MACHINE="FG_4GT_2SX_V2_0"
 
-      - name: Install dependencies
-        run: |
-          apt update
-          apt install make gcc sdcc xxd python-is-python3 libjson-c-dev -y
-      - name: Check if machine.c can be compiled for all machines
-        run: make machine_check
-      - name: Make project
-        run: make MACHINE="KP_9000_6XHML_X2"
+- name: List generated files
+  run: find output -type f -name "*.bin" -ls
+
+- name: Upload firmware
+  uses: actions/upload-artifact@v4
+  with:
+    name: firmware
+    path: output/FG_4GT_2SX_V2_0/*.bin
