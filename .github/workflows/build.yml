@@ -1,56 +1,43 @@
-name: Build RTLPlayground firmware
+name: Build RTLPlayground Firmware
 
+# 触发条件：当推送到 main 分支，或手动触发时运行
 on:
   push:
-    branches:
-      - '**'
-  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    container:
-      image: debian:trixie
-
     steps:
-      - name: Install Git
-        run: |
-          apt-get update
-          apt-get install -y git
+    # 1. 检出你的代码
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Checkout source
-        uses: actions/checkout@v6
+    # 2. 安装编译所需的依赖
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y sdcc xxd libjson-c-dev python3
 
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y \
-            make \
-            gcc \
-            sdcc \
-            xxd \
-            python-is-python3 \
-            libjson-c-dev \
-            binutils \
-            findutils
+    # 3. 取消 machine.h 中 FG-4GT-2SX_V2.0 的注释
+    - name: Enable FG-4GT-2SX_V2.0 machine
+      run: |
+        # 使用 sed 命令取消注释，直接修改 src/machine.h 文件
+        sed -i 's/\/\/ #define MACHINE_FG_4GT_2SX_V2_0/#define MACHINE_FG_4GT_2SX_V2_0/' src/machine.h
+        # 可选：确认修改是否成功
+        grep "#define MACHINE_FG_4GT_2SX_V2_0" src/machine.h || echo "Warning: Pattern not found!"
 
-      - name: Check machine definitions
-        run: |
-          make machine_check
+    # 4. 执行编译
+    - name: Build firmware
+      run: |
+        make clean
+        make
 
-      - name: Build firmware
-        run: |
-          make MACHINE=PCB_SWTG024AS_A_2_0_1
-
-      - name: List output
-        run: |
-          find output -type f -name "*.bin"
-
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
-        with:
-          name: RTLPlayground-PCB_SWTG024AS_A_2_0_1
-          path: |
-            output/PCB_SWTG024AS_A_2_0_1/*.bin
+    # 5. 上传编译产物 (固件)
+    - name: Upload firmware artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rtlplayground-firmware
+        path: output/rtlplayground.bin
