@@ -1,6 +1,5 @@
 name: Build RTLPlayground Firmware
 
-# 触发条件：当推送到 main 分支，或手动触发时运行
 on:
   push:
     branches: [ "main" ]
@@ -11,31 +10,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. 检出你的代码
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. 安装编译所需的依赖
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y sdcc xxd libjson-c-dev python3
 
-    # 3. 取消 machine.h 中 FG-4GT-2SX_V2.0 的注释
-    - name: Enable FG-4GT-2SX_V2.0 machine
-      run: |
-        # 使用 sed 命令取消注释，直接修改 src/machine.h 文件
-        sed -i 's/\/\/ #define MACHINE_FG_4GT_2SX_V2_0/#define MACHINE_FG_4GT_2SX_V2_0/' src/machine.h
-        # 可选：确认修改是否成功
-        grep "#define MACHINE_FG_4GT_2SX_V2_0" src/machine.h || echo "Warning: Pattern not found!"
-
-    # 4. 执行编译
-    - name: Build firmware
+    - name: Build firmware for FG-4GT-2SX_V2_0
       run: |
         make clean
-        make
+        make MACHINE=FG_4GT_2SX_V2_0
 
-    # 5. 上传编译产物 (固件)
     - name: Upload firmware artifact
       uses: actions/upload-artifact@v4
       with:
