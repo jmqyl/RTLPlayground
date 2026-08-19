@@ -273,7 +273,9 @@ void parse_lag(void)
 
 	if (cmd_words_len < 2 || !isnumber(cmd_buffer[cmd_words_b[1]]))
 		goto err;
-	group = cmd_buffer[cmd_words_b[1]] - '0';
+	group = cmd_buffer[cmd_words_b[1]] - '1';
+	if (group > 3)		/* '0' wraps well past three, so one test does both ends */
+		goto err;
 
 	uint8_t w = 2;
 	while (w < cmd_words_len) {
@@ -283,7 +285,9 @@ void parse_lag(void)
 			port = cmd_buffer[cmd_words_b[w]] - '1';
 			if (isnumber(cmd_buffer[cmd_words_b[w] + 1]))
 				port = (port + 1) * 10 + cmd_buffer[cmd_words_b[w] + 1] - '1';
-				port = machine.phys_to_log_port[port];
+			if (port > 8)	/* phys_to_log_port holds nine entries */
+				goto err;
+			port = machine.phys_to_log_port[port];
 		} else {
 			goto err;
 		}
@@ -295,7 +299,7 @@ void parse_lag(void)
 	port_lag_members_set(group, members);
 	return;
 err:
-	print_string("Error: lag <lag> [port]...\n");
+	print_string("Error: lag <1-4> [port]...\n");
 }
 
 
@@ -304,7 +308,11 @@ void parse_lag_hash(void)
 	__xdata uint8_t group;
 	__xdata uint8_t hash = 0;
 
-	group = cmd_buffer[cmd_words_b[1]] - '0';
+	if (cmd_words_len < 2 || !isnumber(cmd_buffer[cmd_words_b[1]]))
+		goto err;
+	group = cmd_buffer[cmd_words_b[1]] - '1';
+	if (group > 3)		/* '0' wraps well past three, so one test does both ends */
+		goto err;
 
 	uint8_t w = 2;
 	while (w < cmd_words_len) {
@@ -330,6 +338,9 @@ void parse_lag_hash(void)
 		w++;
 	}
 	port_lag_hash_set(group, hash);
+	return;
+err:
+	print_string("Error: lag hash <1-4> [type]...\n");
 }
 
 
@@ -417,11 +428,11 @@ void parse_isolate(void)
 
 	print_string("\nISOLATE ");
 
-	__xdata int8_t port_configured = cmd_buffer[cmd_words_b[1]] - '1';
-	port_configured = machine.phys_to_log_port[port_configured];
-	if (isnumber(cmd_buffer[cmd_words_b[1] + 1]))  // CPU-port, logical port 9
-		port_configured = (port_configured + 1) * 10 + cmd_buffer[cmd_words_b[1] + 1] - '1';
-	if (port_configured < 0 || port_configured > 9)
+	if (!isnumber(cmd_buffer[cmd_words_b[1]]) || cmd_buffer[cmd_words_b[1]] == '0'
+	    || isnumber(cmd_buffer[cmd_words_b[1] + 1]))
+		goto err;
+	__xdata uint8_t port_configured = machine.phys_to_log_port[cmd_buffer[cmd_words_b[1]] - '1'];
+	if (port_configured < machine.min_port || port_configured > machine.max_port)
 		goto err;
 
 	print_byte(port_configured); write_char('\n');
@@ -518,7 +529,7 @@ void parse_ingress(void)
 			if (!isnumber(p)) {
 				continue;
 			}
-			if (p - '1' > 9) {
+			if (p < '1') {
 				print_string("Invalid physical port number: "); write_char(p); write_char('\n');
 				continue;
 			}
@@ -1529,10 +1540,12 @@ void cmd_parser(void) __banked
 		} else if (cmd_compare(0, "igmp")) {
 			if (cmd_compare(1, "on"))
 				igmp_enable();
+			else if (cmd_compare(1, "off"))
+				igmp_setup();
 			else if (cmd_compare(1, "show"))
 				igmp_show();
 			else
-				igmp_setup();  // Reverts to default with IP-MC being flooded
+				print_string("Error: igmp on|off|show\n");
 		} else if (cmd_compare(0, "hostname")) {
 			/* "hostname" alone reports the current name; "hostname <text>"
 			 * sets it, sanitized to JSON-safe printable ASCII. A name with
