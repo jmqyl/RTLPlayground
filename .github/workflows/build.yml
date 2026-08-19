@@ -1,8 +1,10 @@
-name: Build firmware
+name: Build RTLPlayground firmware
 
 on:
   push:
-    branches: ['**']
+    branches:
+      - '**'
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -13,36 +15,42 @@ jobs:
       image: debian:trixie
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Install Git
+        run: |
+          apt-get update
+          apt-get install -y git
+
+      - name: Checkout source
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
-          apt update
-          apt install -y \
+          apt-get update
+          apt-get install -y \
             make \
             gcc \
             sdcc \
             xxd \
             python-is-python3 \
-            libjson-c-dev
+            libjson-c-dev \
+            binutils \
+            findutils
 
-      - name: Check if machine.c can be compiled for all machines
+      - name: Check machine definitions
         run: |
           make machine_check
 
-      - name: Make project
+      - name: Build firmware
         run: |
-          make MACHINE="FG_4GT_2SX_V2_0"
+          make MACHINE=PCB_SWTG024AS_A_2_0_1
 
-      - name: Show BIN file
+      - name: List output
         run: |
-          echo "===== Generated BIN ====="
-          find output -type f -name "*.bin" -exec ls -lh {} \;
+          find output -type f -name "*.bin"
 
-      - name: Upload BIN firmware
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: rtlplayground-FG_4GT_2SX_V2_0
-          path: output/*.bin
-          if-no-files-found: error
-          retention-days: 30
+          name: RTLPlayground-PCB_SWTG024AS_A_2_0_1
+          path: |
+            output/PCB_SWTG024AS_A_2_0_1/*.bin
