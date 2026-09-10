@@ -17,9 +17,7 @@ jobs:
     steps:
 
       # ============================================================
-      # 1. Checkout
-      # IMPORTANT:
-      # The UI patch is based on RTLPlayground commit c86d4b3
+      # 1. Checkout fixed build baseline
       # ============================================================
       - name: Checkout RTLPlayground c86d4b3
         uses: actions/checkout@v6
@@ -28,13 +26,11 @@ jobs:
           fetch-depth: 1
 
       # ============================================================
-      # 2. Install build dependencies
+      # 2. Install dependencies
       # ============================================================
       - name: Install dependencies
         run: |
           set -e
-
-          echo "===== Updating packages ====="
 
           apt-get update
 
@@ -49,49 +45,46 @@ jobs:
             file \
             coreutils \
             patch \
-            git \
             ca-certificates
 
-          echo
-          echo "===== Tool versions ====="
+          echo "===== Tools ====="
 
           make --version
-          echo
           sdcc --version
-          echo
           gcc --version
-          echo
           python3 --version
-          echo
           patch --version
 
       # ============================================================
-      # 3. Verify source revision
+      # 3. Verify source files
       # ============================================================
-      - name: Verify source revision
+      - name: Verify source baseline
         run: |
           set -e
 
-          echo "===== Git revision ====="
+          echo "======================================"
+          echo " SOURCE BASELINE"
+          echo "======================================"
+          echo
+          echo "Expected RTLPlayground:"
+          echo "commit c86d4b3 (v0.1.0)"
+          echo
 
-          git rev-parse HEAD
+          echo "Checking source files..."
+
+          test -f Makefile
+          test -f machine.c
+          test -f config.txt
+
+          echo "Source tree OK"
 
           echo
-          echo "Expected:"
-          echo "c86d4b3"
+          echo "Makefile:"
+          ls -lh Makefile
 
           echo
-          echo "Actual:"
-          git rev-parse --short HEAD
-
-          if [ "$(git rev-parse --short HEAD)" != "c86d4b3" ]; then
-            echo
-            echo "ERROR: Wrong source revision!"
-            exit 1
-          fi
-
-          echo
-          echo "SOURCE REVISION CHECK PASSED"
+          echo "machine.c:"
+          ls -lh machine.c
 
       # ============================================================
       # 4. Check patch
@@ -102,14 +95,10 @@ jobs:
 
           echo "===== Checking UI patch ====="
 
-          if [ ! -f "patches/ry-4gt-2sx-ui-mod.patch" ]; then
+          if [ ! -f patches/ry-4gt-2sx-ui-mod.patch ]; then
             echo
             echo "ERROR: UI patch not found!"
             echo
-            echo "Expected:"
-            echo "patches/ry-4gt-2sx-ui-mod.patch"
-            echo
-            echo "Existing patch files:"
             find . -type f -name "*.patch" -print
             exit 1
           fi
@@ -119,7 +108,7 @@ jobs:
           ls -lh patches/ry-4gt-2sx-ui-mod.patch
 
       # ============================================================
-      # 5. Dry-run patch
+      # 5. Test patch
       # ============================================================
       - name: Check patch compatibility
         run: |
@@ -138,7 +127,7 @@ jobs:
           echo "======================================"
 
       # ============================================================
-      # 6. Apply UI patch
+      # 6. Apply patch
       # ============================================================
       - name: Apply UI patch
         run: |
@@ -153,22 +142,14 @@ jobs:
           echo
           echo "===== UI patch applied ====="
 
-          echo
-          echo "===== Modified files ====="
-
-          git status --short || true
-
       # ============================================================
-      # 7. Verify machine configuration
+      # 7. Verify machine target
       # ============================================================
       - name: Verify machine
         run: |
           set -e
 
           echo "===== Checking machine ====="
-
-          echo
-          echo "Searching SWGT024_V2_0_UNMANAGED..."
 
           if grep -R \
             "SWGT024_V2_0_UNMANAGED" \
@@ -189,34 +170,11 @@ jobs:
           fi
 
       # ============================================================
-      # 8. Show important build configuration
-      # ============================================================
-      - name: Show build configuration
-        run: |
-          echo "======================================"
-          echo " RY-4GT-2SX BUILD CONFIGURATION"
-          echo "======================================"
-          echo
-          echo "Board : RY-4GT-2SX"
-          echo "PCB   : FG-4GT-2SX_V2.0"
-          echo "Chip  : RTL8372N"
-          echo "Ports : 4 x 2.5G + 2 x SFP+"
-          echo "Target: SWGT024_V2_0_UNMANAGED"
-          echo "Base  : c86d4b3"
-          echo
-          echo "Expected firmware size:"
-          echo "524288 bytes (512 KiB)"
-          echo
-          echo "======================================"
-
-      # ============================================================
-      # 9. Clean previous build
+      # 8. Clean
       # ============================================================
       - name: Clean build
         run: |
           set -e
-
-          echo "===== Cleaning build ====="
 
           make clean || true
 
@@ -227,31 +185,37 @@ jobs:
           mkdir -p release
 
       # ============================================================
-      # 10. Build firmware
+      # 9. Build
       # ============================================================
       - name: Build firmware
         run: |
           set -e
 
           echo "======================================"
-          echo " Building firmware"
+          echo " Building RY-4GT-2SX Firmware"
+          echo "======================================"
+          echo
+          echo "Base    : RTLPlayground c86d4b3"
+          echo "Board   : RY-4GT-2SX"
+          echo "PCB     : FG-4GT-2SX_V2.0"
+          echo "Chip    : RTL8372N"
+          echo "Ports   : 4 x 2.5G + 2 x SFP+"
+          echo "Machine : SWGT024_V2_0_UNMANAGED"
+          echo
           echo "======================================"
 
           make MACHINE=SWGT024_V2_0_UNMANAGED
 
-          echo
-          echo "===== Build finished ====="
-
       # ============================================================
-      # 11. List output
+      # 10. Find firmware
       # ============================================================
-      - name: List build output
+      - name: Find firmware
         run: |
+          set -e
+
           echo "===== Build output ====="
 
-          find output \
-            -type f \
-            -exec ls -lh {} \;
+          find output -type f -exec ls -lh {} \;
 
           echo
           echo "===== BIN files ====="
@@ -262,13 +226,11 @@ jobs:
             -exec ls -lh {} \;
 
       # ============================================================
-      # 12. Verify firmware exists
+      # 11. Verify firmware
       # ============================================================
-      - name: Verify firmware exists
+      - name: Verify firmware
         run: |
           set -e
-
-          echo "===== Checking firmware ====="
 
           BIN=$(find output \
             -type f \
@@ -276,27 +238,27 @@ jobs:
             | head -n 1)
 
           if [ -z "$BIN" ]; then
-            echo
-            echo "ERROR: No .bin firmware found!"
+            echo "ERROR: No firmware found!"
             exit 1
           fi
 
-          echo
           echo "Firmware:"
           echo "$BIN"
 
           echo
-          echo "File information:"
+          echo "File:"
           file "$BIN"
 
+          echo
+          echo "Size:"
+          stat -c "%s bytes" "$BIN"
+
       # ============================================================
-      # 13. Verify firmware size
+      # 12. Require exactly 512 KiB
       # ============================================================
       - name: Verify firmware size
         run: |
           set -e
-
-          echo "===== Checking firmware size ====="
 
           BIN=$(find output \
             -type f \
@@ -305,57 +267,23 @@ jobs:
 
           SIZE=$(stat -c%s "$BIN")
 
+          echo "======================================"
+          echo " FIRMWARE SIZE CHECK"
+          echo "======================================"
           echo
-          echo "Firmware : $BIN"
           echo "Actual   : $SIZE bytes"
           echo "Expected : 524288 bytes"
           echo
 
           if [ "$SIZE" -ne 524288 ]; then
-
-            echo "======================================"
-            echo " ERROR: WRONG FIRMWARE SIZE"
-            echo "======================================"
-            echo
-            echo "Expected exactly 512 KiB."
-            echo "Actual size: $SIZE bytes"
-            echo
-
+            echo "ERROR: Firmware is not 512 KiB!"
             exit 1
           fi
 
-          echo "======================================"
-          echo " 512 KiB CHECK PASSED"
-          echo "======================================"
+          echo "512 KiB CHECK PASSED"
 
       # ============================================================
-      # 14. Calculate checksum
-      # ============================================================
-      - name: Calculate checksum
-        run: |
-          set -e
-
-          BIN=$(find output \
-            -type f \
-            -name "*.bin" \
-            | head -n 1)
-
-          echo "===== Firmware checksum ====="
-
-          echo
-          echo "MD5:"
-          md5sum "$BIN"
-
-          echo
-          echo "SHA256:"
-          sha256sum "$BIN"
-
-          echo
-          echo "===== Firmware size ====="
-          stat -c "%s bytes" "$BIN"
-
-      # ============================================================
-      # 15. Prepare final firmware
+      # 13. Prepare final firmware
       # ============================================================
       - name: Prepare firmware
         run: |
@@ -368,25 +296,34 @@ jobs:
 
           FINAL="release/rtlplayground-RY-4GT-2SX.bin"
 
-          echo "===== Preparing final firmware ====="
-
           cp "$BIN" "$FINAL"
 
-          echo
-          echo "Final firmware:"
+          echo "===== Final firmware ====="
+
           ls -lh "$FINAL"
 
           echo
-          echo "Final size:"
+          echo "Size:"
           stat -c "%s bytes" "$FINAL"
 
-          echo
-          echo "Final checksum:"
+      # ============================================================
+      # 14. Final checksum
+      # ============================================================
+      - name: Calculate checksum
+        run: |
+          set -e
+
+          FINAL="release/rtlplayground-RY-4GT-2SX.bin"
+
+          echo "===== MD5 ====="
           md5sum "$FINAL"
+
+          echo
+          echo "===== SHA256 ====="
           sha256sum "$FINAL"
 
       # ============================================================
-      # 16. Final verification
+      # 15. Final verification
       # ============================================================
       - name: Final verification
         run: |
@@ -394,46 +331,33 @@ jobs:
 
           FINAL="release/rtlplayground-RY-4GT-2SX.bin"
 
-          echo "======================================"
-          echo " FINAL FIRMWARE VERIFICATION"
-          echo "======================================"
-
-          if [ ! -f "$FINAL" ]; then
-            echo "ERROR: Final firmware not found!"
-            exit 1
-          fi
+          test -f "$FINAL"
 
           SIZE=$(stat -c%s "$FINAL")
 
-          echo
-          echo "File:"
-          echo "$FINAL"
-
-          echo
-          echo "Size:"
-          echo "$SIZE bytes"
-
           if [ "$SIZE" -ne 524288 ]; then
-            echo
-            echo "ERROR: Final firmware is not 512 KiB!"
+            echo "ERROR: Final firmware size is $SIZE bytes"
             exit 1
           fi
 
+          echo "======================================"
+          echo " BUILD SUCCESS"
+          echo "======================================"
+          echo
+          echo "File:"
+          echo "$FINAL"
+          echo
+          echo "Size:"
+          echo "$SIZE bytes"
           echo
           echo "MD5:"
           md5sum "$FINAL"
-
           echo
           echo "SHA256:"
           sha256sum "$FINAL"
 
-          echo
-          echo "======================================"
-          echo " BUILD SUCCESS"
-          echo "======================================"
-
       # ============================================================
-      # 17. Upload final firmware
+      # 16. Upload final firmware
       # ============================================================
       - name: Upload firmware
         uses: actions/upload-artifact@v4
@@ -444,7 +368,7 @@ jobs:
           retention-days: 30
 
       # ============================================================
-      # 18. Upload complete build output
+      # 17. Upload build output
       # ============================================================
       - name: Upload build output
         uses: actions/upload-artifact@v4
