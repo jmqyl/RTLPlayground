@@ -3,7 +3,7 @@ name: Build RY-4GT-2SX UI Firmware
 on:
   push:
     branches:
-      - ry-4gt-2sx-ui
+      - main
   workflow_dispatch:
 
 jobs:
@@ -21,6 +21,8 @@ jobs:
         run: |
           apt update
           apt install -y \
+            git \
+            ca-certificates \
             make \
             gcc \
             sdcc \
@@ -30,7 +32,10 @@ jobs:
 
       - name: Apply UI patch
         run: |
+          echo "Checking patch..."
           git apply --check patches/ry-4gt-2sx-ui-mod.patch
+
+          echo "Applying patch..."
           git apply patches/ry-4gt-2sx-ui-mod.patch
 
       - name: Build
@@ -38,9 +43,13 @@ jobs:
           make clean
           make MACHINE=SWGT024_V2_0_UNMANAGED
 
-      - name: Check firmware size
+      - name: Check firmware
         run: |
-          find output -name "*.bin" -exec ls -lh {} \;
+          echo "Firmware files:"
+          find output -type f -name "*.bin" -exec ls -lh {} \;
+
+          echo "Firmware size:"
+          find output -type f -name "*.bin" -exec stat -c "%n %s bytes" {} \;
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
