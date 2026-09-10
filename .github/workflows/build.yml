@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    name: Build RTL8372N RY-4GT-2SX
+    name: Build RY-4GT-2SX
     runs-on: ubuntu-latest
 
     container:
@@ -17,22 +17,20 @@ jobs:
 
     steps:
 
-      # =========================================================
+      # =====================================================
       # 1. Checkout source
-      # =========================================================
+      # =====================================================
       - name: Checkout source
         uses: actions/checkout@v6
 
-      # =========================================================
-      # 2. Install build dependencies
-      # =========================================================
+      # =====================================================
+      # 2. Install dependencies
+      # =====================================================
       - name: Install dependencies
         run: |
           apt-get update
 
           apt-get install -y \
-            git \
-            ca-certificates \
             make \
             gcc \
             sdcc \
@@ -41,129 +39,148 @@ jobs:
             python-is-python3 \
             libjson-c-dev \
             file \
-            coreutils
+            coreutils \
+            patch \
+            curl \
+            ca-certificates
 
-          echo "===== Tool versions ====="
-          git --version
+          echo "===== Tools ====="
           make --version
           sdcc --version
           gcc --version
           python3 --version
+          patch --version
 
-      # =========================================================
-      # 3. Show repository information
-      # =========================================================
-      - name: Check repository
+      # =====================================================
+      # 3. Check source tree
+      # =====================================================
+      - name: Check source tree
         run: |
           echo "===== Current directory ====="
           pwd
 
-          echo "===== Git status ====="
-          git status
-
-          echo "===== Git commit ====="
-          git log -1 --oneline
-
+          echo
           echo "===== Repository files ====="
           ls -la
 
-      # =========================================================
+          echo
+          echo "===== Source files ====="
+          find . -maxdepth 2 -type f | sort | head -200
+
+      # =====================================================
       # 4. Check UI patch
-      # =========================================================
+      # =====================================================
       - name: Check UI patch
         run: |
-          echo "===== Checking patch file ====="
+          echo "===== Checking UI patch ====="
 
           if [ ! -f "patches/ry-4gt-2sx-ui-mod.patch" ]; then
-            echo "ERROR: patches/ry-4gt-2sx-ui-mod.patch not found!"
             echo
-            echo "Available files:"
-            find . -maxdepth 3 -type f | sort
+            echo "ERROR: UI patch not found!"
+            echo
+            echo "Expected:"
+            echo "patches/ry-4gt-2sx-ui-mod.patch"
+            echo
+            echo "Existing patch files:"
+            find . -type f -name "*.patch" -print
             exit 1
           fi
 
+          echo
           echo "Patch found:"
           ls -lh patches/ry-4gt-2sx-ui-mod.patch
 
-          echo
-          echo "Patch size:"
-          wc -c patches/ry-4gt-2sx-ui-mod.patch
-
-      # =========================================================
-      # 5. Check whether patch can be applied
-      # =========================================================
+      # =====================================================
+      # 5. Check patch compatibility
+      # =====================================================
       - name: Check patch compatibility
         run: |
-          echo "===== Checking patch ====="
+          echo "===== Checking patch compatibility ====="
 
-          git apply --check \
-            patches/ry-4gt-2sx-ui-mod.patch
+          patch \
+            --dry-run \
+            -p1 \
+            < patches/ry-4gt-2sx-ui-mod.patch
 
-          echo "Patch check PASSED."
+          echo
+          echo "======================================"
+          echo " PATCH CHECK PASSED"
+          echo "======================================"
 
-      # =========================================================
+      # =====================================================
       # 6. Apply UI patch
-      # =========================================================
+      # =====================================================
       - name: Apply UI patch
         run: |
           echo "===== Applying UI patch ====="
 
-          git apply \
-            patches/ry-4gt-2sx-ui-mod.patch
+          patch \
+            -p1 \
+            < patches/ry-4gt-2sx-ui-mod.patch
 
           echo
-          echo "===== Git status after patch ====="
-          git status --short
+          echo "===== UI patch applied ====="
 
-      # =========================================================
-      # 7. Verify hardware target
-      # =========================================================
-      - name: Verify RY-4GT-2SX target
+      # =====================================================
+      # 7. Verify machine
+      # =====================================================
+      - name: Verify machine
         run: |
-          echo "===== Checking machine target ====="
+          echo "===== Checking machine ====="
 
-          grep -R \
+          if grep -R \
             "SWGT024_V2_0_UNMANAGED" \
             machine.c \
             Makefile \
             config.txt \
-            2>/dev/null || true
+            2>/dev/null; then
 
-          echo
-          echo "Target:"
-          echo "SWGT024_V2_0_UNMANAGED"
+            echo
+            echo "Machine target found."
 
-      # =========================================================
-      # 8. Clean previous build
-      # =========================================================
+          else
+
+            echo
+            echo "WARNING: SWGT024_V2_0_UNMANAGED not found."
+            echo "Please check machine configuration."
+
+          fi
+
+      # =====================================================
+      # 8. Clean build
+      # =====================================================
       - name: Clean build
         run: |
-          echo "===== make clean ====="
+          echo "===== Cleaning build ====="
+
           make clean || true
 
-          echo
-          echo "===== Output directory ====="
           rm -rf output
           mkdir -p output
 
-      # =========================================================
+      # =====================================================
       # 9. Build firmware
-      # =========================================================
+      # =====================================================
       - name: Build firmware
         run: |
-          echo "=========================================="
-          echo " Building RY-4GT-2SX firmware"
+          echo "======================================"
+          echo " Building firmware"
+          echo
+          echo " Board : RY-4GT-2SX"
+          echo " PCB   : FG-4GT-2SX_V2.0"
+          echo " Chip  : RTL8372N"
+          echo " Ports : 4 x 2.5G + 2 x SFP+"
           echo " Target: SWGT024_V2_0_UNMANAGED"
-          echo "=========================================="
+          echo "======================================"
 
           make MACHINE=SWGT024_V2_0_UNMANAGED
 
-      # =========================================================
-      # 10. List build output
-      # =========================================================
-      - name: List firmware
+      # =====================================================
+      # 10. List output
+      # =====================================================
+      - name: List build output
         run: |
-          echo "===== Build output ====="
+          echo "===== Firmware output ====="
 
           find output \
             -type f \
@@ -171,71 +188,83 @@ jobs:
             -exec ls -lh {} \;
 
           echo
-          echo "===== All output files ====="
+          echo "===== All output ====="
 
           find output \
             -type f \
             -exec ls -lh {} \;
 
-      # =========================================================
-      # 11. Verify firmware size
-      # =========================================================
-      - name: Verify firmware size
+      # =====================================================
+      # 11. Verify firmware exists
+      # =====================================================
+      - name: Verify firmware exists
         run: |
-          echo "===== Checking firmware size ====="
-
           BIN=$(find output \
             -type f \
             -name "*.bin" \
             | head -n 1)
 
           if [ -z "$BIN" ]; then
-            echo "ERROR: No firmware .bin found!"
+            echo
+            echo "ERROR: No .bin firmware found!"
             exit 1
           fi
 
-          SIZE=$(stat -c%s "$BIN")
-
+          echo
           echo "Firmware:"
           echo "$BIN"
 
           echo
-          echo "Size:"
-          echo "$SIZE bytes"
+          echo "File information:"
+          file "$BIN"
 
-          echo
-          echo "Expected:"
-          echo "524288 bytes (512 KiB)"
-
-          if [ "$SIZE" -ne 524288 ]; then
-            echo
-            echo "ERROR: Firmware size is NOT 512 KiB!"
-            echo "Actual:   $SIZE bytes"
-            echo "Expected: 524288 bytes"
-            exit 1
-          fi
-
-          echo
-          echo "=========================================="
-          echo " Firmware size check PASSED"
-          echo " 512 KiB / 524288 bytes"
-          echo "=========================================="
-
-      # =========================================================
-      # 12. Firmware information
-      # =========================================================
-      - name: Generate firmware checksums
+      # =====================================================
+      # 12. Verify firmware size
+      # =====================================================
+      - name: Verify firmware size
         run: |
           BIN=$(find output \
             -type f \
             -name "*.bin" \
             | head -n 1)
 
-          echo "===== Firmware information ====="
+          SIZE=$(stat -c%s "$BIN")
 
-          file "$BIN"
+          echo "======================================"
+          echo " Firmware size"
+          echo "======================================"
+          echo
+          echo "File:"
+          echo "$BIN"
+          echo
+          echo "Actual:"
+          echo "$SIZE bytes"
+          echo
+          echo "Expected:"
+          echo "524288 bytes"
+          echo "512 KiB"
+
+          if [ "$SIZE" -ne 524288 ]; then
+            echo
+            echo "ERROR: Firmware size is not 512 KiB!"
+            exit 1
+          fi
 
           echo
+          echo "======================================"
+          echo " 512 KiB CHECK PASSED"
+          echo "======================================"
+
+      # =====================================================
+      # 13. Calculate checksum
+      # =====================================================
+      - name: Calculate checksum
+        run: |
+          BIN=$(find output \
+            -type f \
+            -name "*.bin" \
+            | head -n 1)
+
           echo "===== MD5 ====="
           md5sum "$BIN"
 
@@ -243,42 +272,39 @@ jobs:
           echo "===== SHA256 ====="
           sha256sum "$BIN"
 
-          echo
-          echo "===== Size ====="
-          stat -c "%n : %s bytes" "$BIN"
-
-      # =========================================================
-      # 13. Rename firmware
-      # =========================================================
-      - name: Prepare release firmware
+      # =====================================================
+      # 14. Prepare firmware
+      # =====================================================
+      - name: Prepare firmware
         run: |
           BIN=$(find output \
             -type f \
             -name "*.bin" \
             | head -n 1)
 
+          rm -rf release
           mkdir -p release
 
           cp "$BIN" \
-            release/rtlplayground-SWGT024_V2_0_UNMANAGED.bin
+            release/rtlplayground-RY-4GT-2SX.bin
 
-          echo "Release firmware:"
+          echo "===== Release firmware ====="
           ls -lh release/
 
-      # =========================================================
-      # 14. Upload firmware artifact
-      # =========================================================
+      # =====================================================
+      # 15. Upload firmware
+      # =====================================================
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: RY-4GT-2SX-Firmware
-          path: release/rtlplayground-SWGT024_V2_0_UNMANAGED.bin
+          path: release/rtlplayground-RY-4GT-2SX.bin
           if-no-files-found: error
           retention-days: 30
 
-      # =========================================================
-      # 15. Upload complete build output
-      # =========================================================
+      # =====================================================
+      # 16. Upload complete output
+      # =====================================================
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
