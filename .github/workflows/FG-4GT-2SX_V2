@@ -1,1 +1,211 @@
+name: Build RTLPlayground Firmware
 
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build FG-4GT-2SX_V2.0
+    runs-on: ubuntu-latest
+
+    container:
+      image: debian:trixie
+
+    steps:
+
+      # ============================================================
+      # 1. Checkout source
+      # ============================================================
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      # ============================================================
+      # 2. Install build dependencies
+      # ============================================================
+      - name: Install dependencies
+        run: |
+          set -eux
+
+          apt-get update
+
+          apt-get install -y \
+            make \
+            gcc \
+            sdcc \
+            xxd \
+            python3 \
+            python-is-python3 \
+            libjson-c-dev \
+            zlib1g-dev \
+            file \
+            coreutils
+
+      # ============================================================
+      # 3. Check tools
+      # ============================================================
+      - name: Check build environment
+        run: |
+          set -eux
+
+          echo "===== Tool versions ====="
+          make --version
+          gcc --version
+          sdcc --version
+          python3 --version
+          xxd -version || true
+
+      # ============================================================
+      # 4. Show repository
+      # ============================================================
+      - name: Show repository
+        run: |
+          set -eux
+
+          echo "===== Current directory ====="
+          pwd
+
+          echo "===== Repository files ====="
+          ls -lah
+
+          echo "===== Makefile ====="
+          test -f Makefile
+
+          echo "===== Available MACHINE definitions ====="
+          grep -R "FG_4GT_2SX" -n . \
+            --exclude-dir=.git \
+            || true
+
+      # ============================================================
+      # 5. Run host unit tests
+      # ============================================================
+      - name: Run host-side unit tests
+        run: |
+          set -eux
+
+          make -C test
+
+      # ============================================================
+      # 6. Check machine.c
+      # ============================================================
+      - name: Check machine.c for all machines
+        run: |
+          set -eux
+
+          make machine_check
+
+      # ============================================================
+      # 7. Build firmware
+      # ============================================================
+      - name: Build firmware
+        run: |
+          set -eux
+
+          export MACHINE="FG_4GT_2SX_V2_0"
+
+          echo "========================================"
+          echo "Building RTLPlayground firmware"
+          echo "MACHINE=${MACHINE}"
+          echo "========================================"
+
+          make MACHINE="${MACHINE}"
+
+      # ============================================================
+      # 8. Inspect build output
+      # ============================================================
+      - name: Inspect build output
+        run: |
+          set -eux
+
+          echo "===== Find BIN files ====="
+
+          find . \
+            -type f \
+            \( -name "*.bin" -o -name "*.hex" -o -name "*.ihx" \) \
+            -not -path "./.git/*" \
+            -print
+
+          echo
+          echo "===== Output directory ====="
+
+          if [ -d output ]; then
+            find output -maxdepth 3 -type f -exec ls -lh {} \;
+          else
+            echo "ERROR: output directory not found"
+            exit 1
+          fi
+
+      # ============================================================
+      # 9. Find firmware automatically
+      # ============================================================
+      - name: Locate firmware
+        run: |
+          set -eux
+
+          mkdir -p firmware
+
+          BIN_FILE=""
+
+          # 优先寻找 FG_4GT_2SX_V2_0
+          BIN_FILE=$(find output -type f -name "*FG_4GT_2SX_V2_0*.bin" | head -n 1 || true)
+
+          # 如果没找到，再寻找任意 BIN
+          if [ -z "${BIN_FILE}" ]; then
+            BIN_FILE=$(find output -type f -name "*.bin" | head -n 1 || true)
+          fi
+
+          if [ -z "${BIN_FILE}" ]; then
+            echo "ERROR: Firmware .bin file not found!"
+            echo
+            echo "===== output directory ====="
+            find output -type f -print
+            exit 1
+          fi
+
+          echo "Found firmware:"
+          echo "${BIN_FILE}"
+
+          cp "${BIN_FILE}" \
+            firmware/rtlplayground-FG_4GT_2SX_V2_0.bin
+
+      # ============================================================
+      # 10. Check firmware size
+      # ============================================================
+      - name: Check firmware
+        run: |
+          set -eux
+
+          FW="firmware/rtlplayground-FG_4GT_2SX_V2_0.bin"
+
+          test -f "${FW}"
+
+          echo "===== Firmware information ====="
+
+          ls -lh "${FW}"
+
+          file "${FW}"
+
+          SIZE=$(stat -c%s "${FW}")
+
+          echo "Firmware size: ${SIZE} bytes"
+
+          # 512 KiB = 524288 bytes
+          if [ "${SIZE}" -eq 524288 ]; then
+            echo "Firmware size is exactly 512 KiB."
+          else
+            echo "WARNING: Firmware is NOT 512 KiB."
+            echo "Actual size: ${SIZE} bytes"
+          fi
+
+      # ============================================================
+      # 11. Upload firmware artifact
+      # ============================================================
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtlplayground-FG_4GT_2SX_V2_0
+          path: firmware/rtlplayground-FG_4GT_2SX_V2_0.bin
+          if-no-files-found: error
+          retention-days: 30
