@@ -1,4 +1,4 @@
-name: Build RTLPlayground Firmware
+name: HYWS-SGT0204S
 
 on:
   push:
