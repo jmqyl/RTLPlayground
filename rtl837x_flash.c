@@ -109,6 +109,7 @@ static void flash_write_enable(void)
  */
 void flash_init(uint8_t enable_dio)
 {
+	enable_dio = 0;
 	if (enable_dio) {
 		SFR_FLASH_CONFIG = 9;  // There may be a chip-select in here
 		SFR_FLASH_CONF_RCMD = CMD_FREAD_DIO;
