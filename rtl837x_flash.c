@@ -107,7 +107,7 @@ static void flash_write_enable(void)
  * This configures fast single IO at 20.8 MHz when the CPU clock is at 20.8MHz
  * and 62.5MHz when the CPU clock is configured at 125MHz
  */
-void flash_init(0)
+void flash_init(uint8_t enable_dio)
 {
 	if (enable_dio) {
 		SFR_FLASH_CONFIG = 9;  // There may be a chip-select in here
