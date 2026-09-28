@@ -42,7 +42,7 @@ static void flash_configure_mmio(void)
 	if (dio_enabled) {
 		SFR_FLASH_MODEB = 0x18;
 		SFR_FLASH_CMD_R = CMD_FREAD_DIO;	// By default we read with Dual speed
-		SFR_FLASH_DUMMYCYCLES = 4;
+		SFR_FLASH_DUMMYCYCLES = 8;
 		return;
 	}
 
