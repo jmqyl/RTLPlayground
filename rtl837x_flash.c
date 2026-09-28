@@ -208,6 +208,10 @@ void flash_read_jedecid(void)
 	print_string("\n  Capacity:        0x");
 	flash_capacity_code = SFR_FLASH_DATA16;
 	flash_size = 1UL << flash_capacity_code;
+	// ZB25WD40B: JEDEC ID 0x13325E, capacity code should be 0x13 (512KB)
+	if (SFR_FLASH_DATA0 == 0x13 && SFR_FLASH_DATA8 == 0x32 && SFR_FLASH_DATA16 == 0x5E) {
+		flash_capacity_code = 0x13;  // Force 512KB
+	}
 	print_byte(flash_capacity_code);
 	print_string(" = "); print_string(get_flash_size_str()); write_char('\n');
 
