@@ -609,7 +609,7 @@ __code const struct machine machine = {
 
 //#if defined(MACHINE_HYWS_SGT0204S)
 //    .machine_name = "HYWS-SGT0204S",
-#elif defined(MACHINE_PCB_K0402WS_V3)
+#if defined(MACHINE_PCB_K0402WS_V3)
     .machine_name = "PCB-K0402WS-V3.0",
 #else
     .machine_name = "HI-K0402WS",
