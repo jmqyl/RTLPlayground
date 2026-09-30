@@ -50,6 +50,12 @@ jobs:
         run: |
           make machine_check
 
+      - name: Check Git version
+        run: |
+          git --version
+          git describe --tags --always --dirty
+          git rev-parse --short HEAD
+      
       # ============================================================
       # 5. Build HYWS_SGT0204S firmware
       # ============================================================
