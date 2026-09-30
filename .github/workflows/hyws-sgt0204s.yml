@@ -15,11 +15,14 @@ jobs:
       image: debian:trixie
 
     steps:
+
       # ============================================================
       # 1. Checkout source
       # ============================================================
       - name: Checkout source
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       # ============================================================
       # 2. Install dependencies
@@ -28,36 +31,90 @@ jobs:
         run: |
           apt update
           apt install -y \
+            git \
             make \
             gcc \
             sdcc \
             xxd \
+            python3 \
             python-is-python3 \
             libjson-c-dev \
-            zlib1g-dev
+            zlib1g-dev \
+            file \
+            coreutils
 
       # ============================================================
-      # 3. Host-side unit tests
+      # 3. Restore Git repository if checkout used REST fallback
+      # ============================================================
+      - name: Initialize Git repository
+        run: |
+          if [ ! -d .git ]; then
+            echo "===== .git not found, initializing repository ====="
+
+            git init
+
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+
+            git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+
+            echo "===== Fetch current commit ====="
+            git fetch origin "${GITHUB_SHA}"
+
+            echo "===== Fetch tags ====="
+            git fetch --tags origin
+
+            git checkout -f "${GITHUB_SHA}"
+          else
+            echo "===== Git repository already exists ====="
+
+            git fetch --tags --force origin
+          fi
+
+      # ============================================================
+      # 4. Check Git information
+      # ============================================================
+      - name: Check Git version
+        run: |
+          echo "===== Git version ====="
+          git --version
+
+          echo
+          echo "===== Repository ====="
+          git rev-parse --is-inside-work-tree
+
+          echo
+          echo "===== Commit ====="
+          git rev-parse --short HEAD
+
+          echo
+          echo "===== Tags ====="
+          git tag --list
+
+          echo
+          echo "===== Git describe ====="
+          git describe --tags --always --dirty
+
+          echo
+          echo "===== Status ====="
+          git status --short
+
+      # ============================================================
+      # 5. Host-side unit tests
       # ============================================================
       - name: Run the host-side unit tests
         run: |
           make -C test
 
       # ============================================================
-      # 4. Check all machine configurations
+      # 6. Check all machine configurations
       # ============================================================
       - name: Check if machine.c can be compiled for all machines
         run: |
           make machine_check
 
-      - name: Check Git version
-        run: |
-          git --version
-          git describe --tags --always --dirty
-          git rev-parse --short HEAD
-      
       # ============================================================
-      # 5. Build HYWS_SGT0204S firmware
+      # 7. Build HYWS_SGT0204S firmware
       # ============================================================
       - name: Build HYWS_SGT0204S
         run: |
@@ -65,17 +122,19 @@ jobs:
           make CI=1 MACHINE="HYWS_SGT0204S"
 
       # ============================================================
-      # 6. Show build output
+      # 8. Show build output
       # ============================================================
       - name: List build output
         run: |
           echo "===== Build output ====="
-          find output -type f -maxdepth 2 -print
+          find output -maxdepth 2 -type f -print
+
+          echo
           echo "===== File information ====="
-          find output -type f -maxdepth 2 -exec ls -lh {} \;
+          find output -maxdepth 2 -type f -exec ls -lh {} \;
 
       # ============================================================
-      # 7. Upload firmware artifact
+      # 9. Upload firmware artifact
       # ============================================================
       - name: Upload HYWS_SGT0204S firmware
         uses: actions/upload-artifact@v4
